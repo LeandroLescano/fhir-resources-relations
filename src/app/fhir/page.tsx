@@ -110,6 +110,38 @@ const Graph = () => {
           avoidOverlap: 2,
         },
       },
+      manipulation: {
+        enabled: true,
+        addNode: function (data: any, callback: any) {
+          // filling in the popup DOM elements
+          // setOpenAddDialog(true);
+          callback();
+        },
+        addEdge: async function (data: any, callback: any) {
+          edges.current.add({from: data.from, to: data.to});
+          callback(data);
+        },
+        deleteEdge: async function (data: any, callback: any) {
+          let edgeFind = edges.current
+            .get({returnType: "Array"})
+            .find((e) => e.id === data.edges[0]);
+          if (edgeFind) {
+            let fromObj = nodes.current
+              .get({returnType: "Array"})
+              .find((n) => n.id === edgeFind.from);
+            let toObj = nodes.current
+              .get({returnType: "Array"})
+              .find((n) => n.id === edgeFind.to);
+            const res = confirm(
+              `Quieres remover la relación seleccionada? \n SOURCE: ${fromObj.label} \n\n TARGET:  ${toObj.label}`
+            );
+            if (res == true) {
+              edges.current.remove(data.edges[0]);
+            }
+            callback();
+          }
+        },
+      },
       edges: {
         smooth: {
           enabled: true,

@@ -12,6 +12,22 @@ export const metadata: Metadata = {
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="en">
+      <head>
+        <script
+          type="text/javascript"
+          src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"
+        />
+        <link
+          href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css"
+          rel="stylesheet"
+          type="text/css"
+        />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1.0"
+        ></meta>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      </head>
       <body className={inter.className}>{children}</body>
     </html>
   );
