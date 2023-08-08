@@ -14,7 +14,10 @@ const Graph = () => {
   const visJsRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   const highlightActive = useRef(false);
-  const [graphData, setGraphData] = useState(null);
+  const [graphNames, setGraphNames] = useState<string[]>([]);
+  const [selectedAtom, setSelectedAtom] = useState<
+    {name: string; nodes: any[]; edges: any[]}[]
+  >([]);
 
   const getData = async () => {
     const savedGraphDataString = localStorage.getItem("graphs");
@@ -25,8 +28,6 @@ const Graph = () => {
       let edgesAux = [];
       let nombreAux = [];
       let index = 1;
-
-      setGraphData(savedGraphData);
 
       for (let atomo of savedGraphData) {
         nombreAux.push({
@@ -59,6 +60,15 @@ const Graph = () => {
       nodes.current.update(nodesAux);
       edges.current.update(edgesAux);
       nombre.current.update(nombreAux);
+
+      const nombresArray = nombreAux.map((item) => item.nombre);
+
+      const nombreDivs = nombresArray.map((nombre, index) => (
+        <div key={index}>{nombre}</div>
+      ));
+
+      setGraphNames(nombresArray);
+      return nombreDivs;
     }
   };
 
@@ -356,6 +366,22 @@ const Graph = () => {
             backgroundColor: "#1a1a1a",
           }}
         />
+        <div
+          style={{
+            width: "30vw",
+            display: "flex",
+            flexDirection: "column",
+            padding: "2%",
+            gap: "1rem",
+          }}
+        >
+          {graphNames.map((nombre, i) => (
+            <div>
+              <input type="checkbox" name={nombre} onChange={(e) => e.target.checked ? setSelectedAtom(prev => [...prev, graphNames.find((gd) => gd.nombre === nombre)])[] : [] } />
+              <label> {nombre}</label>
+            </div>
+          ))}
+        </div>
       </div>
       <div>
         <Link passHref href="/new">
@@ -373,21 +399,6 @@ const Graph = () => {
           />{" "}
           Habilitar físicas
         </label>
-      </div>
-      <div>
-        {graphData.nombre.map((name) => (
-          <div key={name}>
-            <label>
-              <input
-                type="checkbox"
-                value={name}
-                // checked={graphNames.includes(name)}
-                // onChange={handleCheckboxChange}
-              />
-              {name}
-            </label>
-          </div>
-        ))}
       </div>
     </>
   );
