@@ -1,83 +1,111 @@
 "use client";
+
 import React, {useEffect, useRef, useState} from "react";
 import {DataSet} from "vis-data";
-import {IdType, Network, Options} from "vis-network";
+import {Edge, IdType, Network, Node, Options} from "vis-network";
+import {useRouter, useSearchParams} from "next/navigation";
 import Head from "next/head";
-import Link from "next/link";
 
-interface graphData {
-  nombre: string;
-  nodes: any[];
-  edges: any[];
-}
+import {getFHIRResources} from "src/utils/processText";
 
 const Graph = () => {
-  const [selectedNode, setSelectedNode] = useState<{[key: string]: string}>({});
-  const network = useRef<Network | null>(null);
   const nodes = useRef<DataSet<any, any>>(new DataSet());
   const edges = useRef<DataSet<any, any>>(new DataSet());
-  const nombre = useRef<DataSet<any, any>>(new DataSet());
-  const visJsRef = useRef<HTMLDivElement>(null);
+  const [selectedNode, setSelectedNode] = useState<{[key: string]: string}>({});
   const [loading, setLoading] = useState(false);
+  const network = useRef<Network | null>(null);
   const highlightActive = useRef(false);
   const [graphNames, setGraphNames] = useState<string[]>([]);
-  const [selectedAtoms, setSelectedAtoms] = useState<graphData[]>([]);
-  const [graphData, setGraphData] = useState<graphData[]>([]);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const visJsRef = useRef<HTMLDivElement>(null);
 
   const getData = async () => {
-    const savedGraphDataString = localStorage.getItem("graphs");
-    if (savedGraphDataString) {
-      const savedGraphData = JSON.parse(savedGraphDataString);
-      setGraphData(savedGraphData);
+    const resources = getFHIRResources();
 
-      let nodesAux = [];
-      let edgesAux = [];
-      let nombreAux = [];
-      let index = 1;
+    const resourcesNodes = resources.map((res) => ({
+      label: res.resourceType,
+      id: res.resourceType,
+      group: "1",
+    }));
 
-      for (let atomo of savedGraphData) {
-        nombreAux.push({
-          nombre: atomo.nombre,
-          group: index,
-        });
+    nodes.current.clear();
+    nodes.current.update(resourcesNodes);
 
-        nodesAux.push(
-          ...atomo.nodes.map((node: any) => ({
-            ...node,
-            group: atomo.nombre,
-            id: node.id + index,
-            selectable: false,
-          }))
-        );
-        edgesAux.push(
-          ...atomo.edges.map((edge: any) => ({
-            ...edge,
-            group: index,
-            from: edge.from + index,
-            to: edge.to + index,
-          }))
-        );
-        index++;
+    const resourcesEdges = [];
+
+    for (const res of resources) {
+      for (const props of Object.entries(res)) {
+        const edgeLabel = props[0];
+        const connections = props[1];
+        if (connections) {
+          if (typeof connections !== "string") {
+            for (const connection of connections as string[]) {
+              resourcesEdges.push({
+                from: res.resourceType,
+                to: connection,
+                label: edgeLabel,
+              });
+            }
+          }
+        }
       }
-
-      nodes.current.clear();
-      edges.current.clear();
-      nombre.current.clear();
-
-      nodes.current.update(nodesAux);
-      edges.current.update(edgesAux);
-      nombre.current.update(nombreAux);
-
-      const nombresArray = nombreAux.map((item) => item.nombre);
-
-      const nombreDivs = nombresArray.map((nombre, index) => (
-        <div key={index}>{nombre}</div>
-      ));
-
-      setGraphNames(nombresArray);
-      return nombreDivs;
     }
+
+    const groupedEdges: any[] = [];
+
+    for (const edge of resourcesEdges) {
+      const findedEdge = groupedEdges.find(
+        (e) => e.from === edge.from && edge.to === e.to
+      );
+      if (findedEdge) {
+        findedEdge.label += ", " + edge.label;
+      } else {
+        groupedEdges.push(edge);
+      }
+    }
+    console.log({groupedEdges});
+    edges.current.clear();
+    edges.current.update(groupedEdges);
   };
+
+  function saveGraph() {
+    const graphData = {
+      nombre: nombre.current.get({returnType: "string"}),
+      nodes: nodes.current.get({returnType: "Array"}),
+      edges: edges.current.get({returnType: "Array"}),
+    };
+
+    // Retrieve existing graphs (if any) from local storage
+    const existingGraphsString = localStorage.getItem("graphs");
+    let existingGraphs = existingGraphsString
+      ? JSON.parse(existingGraphsString)
+      : [];
+
+    // Add the new graph data (as an object) to the array of existing graphs
+    existingGraphs.push(graphData);
+
+    // Save the updated array of graphs to local storage
+    const updatedGraphsString = JSON.stringify(existingGraphs);
+    localStorage.setItem("graphs", updatedGraphsString);
+
+    // Redirect to the main page
+
+    router.push("/fhir");
+  }
+
+  useEffect(() => {
+    const selectedGraphNames = searchParams.get("selectedGraphNames");
+    if (selectedGraphNames) {
+      const decodedNames = JSON.parse(
+        decodeURIComponent(selectedGraphNames as unknown as string)
+      );
+      setGraphNames(decodedNames);
+    }
+  }, [searchParams]);
+
+  console.log(graphNames);
 
   useEffect(() => {
     const options: Options = {
@@ -123,6 +151,28 @@ const Graph = () => {
         stabilization: {iterations: 150},
         hierarchicalRepulsion: {
           avoidOverlap: 2,
+        },
+      },
+      manipulation: {
+        deleteEdge: async function (data: any, callback: any) {
+          let edgeFind = edges.current
+            .get({returnType: "Array"})
+            .find((e) => e.id === data.edges[0]);
+          if (edgeFind) {
+            let fromObj = nodes.current
+              .get({returnType: "Array"})
+              .find((n) => n.id === edgeFind.from);
+            let toObj = nodes.current
+              .get({returnType: "Array"})
+              .find((n) => n.id === edgeFind.to);
+            const res = confirm(
+              `Quieres remover la relación seleccionada? \n SOURCE: ${fromObj.label} \n\n TARGET:  ${toObj.label}`
+            );
+            if (res == true) {
+              edges.current.remove(data.edges[0]);
+            }
+            callback();
+          }
         },
       },
       edges: {
@@ -373,41 +423,8 @@ const Graph = () => {
             backgroundColor: "#1a1a1a",
           }}
         />
-        <div
-          style={{
-            width: "30vw",
-            display: "flex",
-            flexDirection: "column",
-            padding: "2%",
-            gap: "1rem",
-          }}
-        >
-          {graphNames.map((nombre, i) => (
-            <div>
-              <input
-                type="checkbox"
-                name={nombre}
-                onChange={(e) =>
-                  e.target.checked
-                    ? setSelectedAtoms((prev) => [
-                        ...prev,
-                        graphData.find((gd) => gd.nombre === nombre)!,
-                      ])
-                    : setSelectedAtoms((prev) =>
-                        prev.filter((atom) => atom.nombre !== nombre)
-                      )
-                }
-              />
-              <label> {nombre}</label>
-            </div>
-          ))}
-        </div>
       </div>
       <div>
-        <Link passHref href="/new">
-          <button>Agregar nuevo grupo</button>
-        </Link>
-
         <label>
           <input
             type="checkbox"
@@ -419,16 +436,8 @@ const Graph = () => {
           />{" "}
           Habilitar físicas
         </label>
-        {selectedAtoms.length > 0 && (
-          <Link
-            passHref
-            href={`/edit?selectedGraphNames=${encodeURIComponent(
-              JSON.stringify(selectedAtoms.map((sa) => sa.nombre))
-            )}`}
-          >
-            <button>Editar</button>
-          </Link>
-        )}
+        <label> </label>
+        <button onClick={saveGraph}>Guardar</button>
       </div>
     </>
   );
