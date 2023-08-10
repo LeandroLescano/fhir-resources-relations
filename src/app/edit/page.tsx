@@ -72,7 +72,7 @@ const Graph = () => {
 
   function saveGraph() {
     const graphData = {
-      nombre: nombre.current.get({returnType: "string"}),
+      // nombre: nombre.current.get({returnType: "string"}),
       nodes: nodes.current.get({returnType: "Array"}),
       edges: edges.current.get({returnType: "Array"}),
     };

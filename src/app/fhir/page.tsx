@@ -4,6 +4,7 @@ import {DataSet} from "vis-data";
 import {IdType, Network, Options} from "vis-network";
 import Head from "next/head";
 import Link from "next/link";
+import {generateRandomLightColor} from "src/utils/color";
 
 interface graphData {
   nombre: string;
@@ -23,6 +24,9 @@ const Graph = () => {
   const [graphNames, setGraphNames] = useState<string[]>([]);
   const [selectedAtoms, setSelectedAtoms] = useState<graphData[]>([]);
   const [graphData, setGraphData] = useState<graphData[]>([]);
+  const [defaultColors, setDefaultColors] = useState<
+    {atomName: string; color: string}[]
+  >([]);
 
   const getData = async () => {
     const savedGraphDataString = localStorage.getItem("graphs");
@@ -75,9 +79,43 @@ const Graph = () => {
       ));
 
       setGraphNames(nombresArray);
-      return nombreDivs;
+      const colors = nombresArray.map((n) => ({
+        atomName: n,
+        color: generateRandomLightColor(),
+      }));
+      setDefaultColors(colors);
+      const groupColors: {[key: string]: any} = {};
+      for (const c of colors) {
+        groupColors[c.atomName] = {
+          color: {backgroundColor: c.color, borderWidth: 3},
+        };
+      }
+      return groupColors;
     }
   };
+
+  useEffect(() => {
+    const selectedGroups = selectedAtoms.map((sa) => sa.nombre);
+    const nonSelectedGroups = graphNames.filter(
+      (gn) => !selectedGroups.includes(gn)
+    );
+    let groupsColors: {[key: string]: any} = {};
+    for (const nonSelected of nonSelectedGroups) {
+      groupsColors[nonSelected] = {color: {background: "gray"}};
+    }
+    for (const selected of selectedGroups) {
+      groupsColors[selected] = {
+        color: {
+          background: defaultColors.find((dc) => dc.atomName === selected)
+            ?.color,
+        },
+      };
+    }
+    network.current?.setOptions({
+      groups: groupsColors,
+      edges: {color: {inherit: "to"}},
+    });
+  }, [selectedAtoms]);
 
   useEffect(() => {
     const options: Options = {
@@ -156,13 +194,13 @@ const Graph = () => {
       },
     };
 
-    getData().then(() => {
+    getData().then((groupColors) => {
       network.current =
         visJsRef.current &&
         new Network(
           visJsRef.current,
           {nodes: nodes.current, edges: edges.current},
-          options
+          {...options, groups: groupColors}
         );
 
       network.current?.on("click", (params) => {
@@ -375,7 +413,7 @@ const Graph = () => {
         />
         <div
           style={{
-            width: "30vw",
+            width: "20vw",
             display: "flex",
             flexDirection: "column",
             padding: "2%",
@@ -383,7 +421,7 @@ const Graph = () => {
           }}
         >
           {graphNames.map((nombre, i) => (
-            <div>
+            <div key={i}>
               <input
                 type="checkbox"
                 name={nombre}

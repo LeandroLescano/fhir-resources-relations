@@ -71,7 +71,9 @@ const Graph = () => {
     const graphData = {
       nombre: prompt("Ingresa el nombre del grupo"),
       nodes: nodes.current.get({returnType: "Array"}),
-      edges: edges.current.get({returnType: "Array"}),
+      edges: edges.current
+        .get({returnType: "Array"})
+        .map((e) => ({...e, label: e.label ?? e.hiddenLabel ?? ""})),
     };
 
     // Retrieve existing graphs (if any) from local storage
