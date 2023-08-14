@@ -437,6 +437,10 @@ const Graph = () => {
                 }
               />
               <label> {nombre}</label>
+
+              <Link passHref href={`/edit?selectedGraphNames=${nombre}`}>
+                <button>Editar</button>
+              </Link>
             </div>
           ))}
         </div>
@@ -457,16 +461,6 @@ const Graph = () => {
           />{" "}
           Habilitar físicas
         </label>
-        {selectedAtoms.length > 0 && (
-          <Link
-            passHref
-            href={`/edit?selectedGraphNames=${encodeURIComponent(
-              JSON.stringify(selectedAtoms.map((sa) => sa.nombre))
-            )}`}
-          >
-            <button>Editar</button>
-          </Link>
-        )}
       </div>
     </>
   );

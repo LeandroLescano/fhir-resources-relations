@@ -97,15 +97,76 @@ const Graph = () => {
 
   useEffect(() => {
     const selectedGraphNames = searchParams.get("selectedGraphNames");
+
     if (selectedGraphNames) {
-      const decodedNames = JSON.parse(
-        decodeURIComponent(selectedGraphNames as unknown as string)
+      //Filtrado de grafos por nombre
+
+      const existingGraphs = JSON.parse(localStorage.getItem("graphs") || "[]");
+
+      const filteredGraphs = existingGraphs.find((graph) =>
+        selectedGraphNames.includes(graph.nombre)
       );
-      setGraphNames(decodedNames);
+
+      console.log(filteredGraphs);
+      nodes.current.update(filteredGraphs.nodes);
+      edges.current.update(filteredGraphs.edges);
+
+      //former .then
+      network.current =
+        visJsRef.current &&
+        new Network(visJsRef.current, {
+          nodes: nodes.current,
+          edges: edges.current,
+        });
+
+      network.current?.on("click", (params) => {
+        neighbourhoodHighlight(params);
+        // setSelectedNodes(network.current?.getSelectedNodes());
+      });
+      network.current?.on("oncontext", (params) => {
+        params.event.preventDefault();
+        let currentNode = nodes.current.get(
+          network.current?.getNodeAt(params.pointer.DOM) as string
+        );
+        if (currentNode && currentNode.length === undefined) {
+          // setlocalSelectedNode(currentNode);
+          setSelectedNode(currentNode);
+          neighbourhoodHighlight({nodes: [currentNode.id]});
+        }
+      });
+
+      network.current?.once("stabilizationIterationsDone", function () {
+        network.current?.setOptions({physics: false});
+      });
+
+      network.current?.on("selectNode", (event: {nodes: string[]}) => {
+        if (event.nodes?.length === 1) {
+          let selected = {
+            ...nodes.current
+              .get({returnType: "Array"})
+              .find((n: any) => n.id === event.nodes[0]),
+          };
+          delete selected?.label;
+          delete selected?.group;
+          delete selected?.color;
+          delete selected?.hiddenLabel;
+          delete selected?.font;
+          delete selected?.idClass;
+          delete selected?.idType;
+          delete selected?.type;
+          delete selected?.class;
+          delete selected?.id;
+          // setSelectedNode(JSON.stringify(selected, undefined, 2));
+          setSelectedNode(selected);
+        }
+      });
+      network.current?.on("selectEdge", (event: {edges: string[]}) => {
+        let edge = edges.current
+          .get({returnType: "Array"})
+          .find((ed) => ed.id === event.edges[0]);
+      });
     }
   }, [searchParams]);
-
-  console.log(graphNames);
 
   useEffect(() => {
     const options: Options = {
@@ -205,63 +266,6 @@ const Graph = () => {
         },
       },
     };
-
-    getData().then(() => {
-      network.current =
-        visJsRef.current &&
-        new Network(
-          visJsRef.current,
-          {nodes: nodes.current, edges: edges.current},
-          options
-        );
-
-      network.current?.on("click", (params) => {
-        neighbourhoodHighlight(params);
-        // setSelectedNodes(network.current?.getSelectedNodes());
-      });
-      network.current?.on("oncontext", (params) => {
-        params.event.preventDefault();
-        let currentNode = nodes.current.get(
-          network.current?.getNodeAt(params.pointer.DOM) as string
-        );
-        if (currentNode && currentNode.length === undefined) {
-          // setlocalSelectedNode(currentNode);
-          setSelectedNode(currentNode);
-          neighbourhoodHighlight({nodes: [currentNode.id]});
-        }
-      });
-
-      network.current?.once("stabilizationIterationsDone", function () {
-        network.current?.setOptions({physics: false});
-      });
-
-      network.current?.on("selectNode", (event: {nodes: string[]}) => {
-        if (event.nodes?.length === 1) {
-          let selected = {
-            ...nodes.current
-              .get({returnType: "Array"})
-              .find((n: any) => n.id === event.nodes[0]),
-          };
-          delete selected?.label;
-          delete selected?.group;
-          delete selected?.color;
-          delete selected?.hiddenLabel;
-          delete selected?.font;
-          delete selected?.idClass;
-          delete selected?.idType;
-          delete selected?.type;
-          delete selected?.class;
-          delete selected?.id;
-          // setSelectedNode(JSON.stringify(selected, undefined, 2));
-          setSelectedNode(selected);
-        }
-      });
-      network.current?.on("selectEdge", (event: {edges: string[]}) => {
-        let edge = edges.current
-          .get({returnType: "Array"})
-          .find((ed) => ed.id === event.edges[0]);
-      });
-    });
   }, []);
 
   const neighbourhoodHighlight = (params: any) => {
