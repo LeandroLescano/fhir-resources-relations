@@ -2,7 +2,7 @@
 
 import React, {useEffect, useRef, useState} from "react";
 import {DataSet} from "vis-data";
-import {Edge, IdType, Network, Node, Options} from "vis-network";
+import {IdType, Network, Options} from "vis-network";
 import {useRouter, useSearchParams} from "next/navigation";
 import Head from "next/head";
 
@@ -21,58 +21,11 @@ const Graph = () => {
 
   const visJsRef = useRef<HTMLDivElement>(null);
 
-  const getData = async () => {
-    const resources = getFHIRResources();
-
-    const resourcesNodes = resources.map((res) => ({
-      label: res.resourceType,
-      id: res.resourceType,
-      group: "1",
-    }));
-
-    nodes.current.clear();
-    nodes.current.update(resourcesNodes);
-
-    const resourcesEdges = [];
-
-    for (const res of resources) {
-      for (const props of Object.entries(res)) {
-        const edgeLabel = props[0];
-        const connections = props[1];
-        if (connections) {
-          if (typeof connections !== "string") {
-            for (const connection of connections as string[]) {
-              resourcesEdges.push({
-                from: res.resourceType,
-                to: connection,
-                label: edgeLabel,
-              });
-            }
-          }
-        }
-      }
-    }
-
-    const groupedEdges: any[] = [];
-
-    for (const edge of resourcesEdges) {
-      const findedEdge = groupedEdges.find(
-        (e) => e.from === edge.from && edge.to === e.to
-      );
-      if (findedEdge) {
-        findedEdge.label += ", " + edge.label;
-      } else {
-        groupedEdges.push(edge);
-      }
-    }
-    console.log({groupedEdges});
-    edges.current.clear();
-    edges.current.update(groupedEdges);
-  };
-
   function saveGraph() {
+    const selectedGraphName = searchParams.get("selectedGraphNames");
+
     const graphData = {
-      // nombre: nombre.current.get({returnType: "string"}),
+      nombre: selectedGraphName,
       nodes: nodes.current.get({returnType: "Array"}),
       edges: edges.current.get({returnType: "Array"}),
     };
@@ -83,15 +36,24 @@ const Graph = () => {
       ? JSON.parse(existingGraphsString)
       : [];
 
-    // Add the new graph data (as an object) to the array of existing graphs
-    existingGraphs.push(graphData);
+    // Find the index of the graph with the same name in the existing graphs array
+    const existingGraphIndex = existingGraphs.findIndex(
+      (graph: any) => graph.nombre === selectedGraphName
+    );
+
+    if (existingGraphIndex !== -1) {
+      // Update the existing graph with the new data
+      existingGraphs[existingGraphIndex] = graphData;
+    } else {
+      // Add the new graph data (as an object) to the array of existing graphs
+      existingGraphs.push(graphData);
+    }
 
     // Save the updated array of graphs to local storage
     const updatedGraphsString = JSON.stringify(existingGraphs);
     localStorage.setItem("graphs", updatedGraphsString);
 
     // Redirect to the main page
-
     router.push("/fhir");
   }
 
@@ -103,7 +65,7 @@ const Graph = () => {
 
       const existingGraphs = JSON.parse(localStorage.getItem("graphs") || "[]");
 
-      const filteredGraphs = existingGraphs.find((graph) =>
+      const filteredGraphs = existingGraphs.find((graph: any) =>
         selectedGraphNames.includes(graph.nombre)
       );
 
@@ -111,13 +73,115 @@ const Graph = () => {
       nodes.current.update(filteredGraphs.nodes);
       edges.current.update(filteredGraphs.edges);
 
+      const options: Options = {
+        autoResize: true,
+        locale: "es",
+        layout: {
+          randomSeed: 1,
+          improvedLayout: true,
+          hierarchical: {
+            enabled: false,
+            levelSeparation: 10,
+            nodeSpacing: 10,
+            treeSpacing: 1,
+            blockShifting: false,
+            edgeMinimization: true,
+            parentCentralization: true,
+            direction: "LR", // UD, DU, LR, RL
+            sortMethod: "hubsize", // hubsize, directed
+            shakeTowards: "roots", // roots, leaves
+            // enabled: true,
+            // levelSeparation: 150,
+            // nodeSpacing: 110,
+            // treeSpacing: 200,
+            // blockShifting: false,
+            // edgeMinimization: true,
+            // parentCentralization: true,
+            // direction: "LR",
+            // sortMethod: "directed",
+            // shakeTowards: "roots",
+          },
+        },
+        physics: {
+          enabled: true, //! if true, AFFECTS PERFORMANCE
+          // forceAtlas2Based: {
+          //   gravitationalConstant: -26,
+          //   centralGravity: 0.005,
+          //   springLength: 230,
+          //   springConstant: 0.18,
+          // },
+          maxVelocity: 146,
+          solver: "forceAtlas2Based",
+          timestep: 0.35,
+          stabilization: {iterations: 150},
+          hierarchicalRepulsion: {
+            avoidOverlap: 2,
+          },
+        },
+        edges: {
+          smooth: {
+            enabled: true,
+            type: "dynamic",
+            roundness: 0.5,
+          },
+          font: {
+            size: 12,
+            strokeWidth: 0,
+            color: "white",
+          },
+          arrows: {
+            to: {
+              enabled: true,
+              scaleFactor: 1,
+              type: "arrow",
+            },
+          },
+          color: {inherit: "to"},
+        },
+        nodes: {
+          shape: "box",
+          shadow: true,
+          borderWidth: 0,
+          font: {
+            multi: "html",
+            face: "tahoma",
+          },
+        },
+        manipulation: {
+          deleteEdge: async function (data: any, callback: any) {
+            let edgeFind = edges.current
+              .get({returnType: "Array"})
+              .find((e) => e.id === data.edges[0]);
+            if (edgeFind) {
+              let fromObj = nodes.current
+                .get({returnType: "Array"})
+                .find((n) => n.id === edgeFind.from);
+              let toObj = nodes.current
+                .get({returnType: "Array"})
+                .find((n) => n.id === edgeFind.to);
+              const res = confirm(
+                `Quieres remover la relación seleccionada? \n SOURCE: ${fromObj.label} \n\n TARGET:  ${toObj.label}`
+              );
+              if (res == true) {
+                edges.current.remove(data.edges[0]);
+              }
+              callback();
+            }
+          },
+        },
+      };
+
       //former .then
       network.current =
         visJsRef.current &&
-        new Network(visJsRef.current, {
-          nodes: nodes.current,
-          edges: edges.current,
-        });
+        new Network(
+          visJsRef.current,
+          {
+            nodes: nodes.current,
+            edges: edges.current,
+          },
+          options
+        );
 
       network.current?.on("click", (params) => {
         neighbourhoodHighlight(params);
@@ -439,8 +503,7 @@ const Graph = () => {
             }
           />{" "}
           Habilitar físicas
-        </label>
-        <label> </label>
+        </label>{" "}
         <button onClick={saveGraph}>Guardar</button>
       </div>
     </>
